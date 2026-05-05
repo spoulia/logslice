@@ -113,4 +113,11 @@ class TestTailFile:
         t.join(timeout=0.1)
 
         assert len(collected) == 1
-        assert "payment" in (collected[0].get("message") or "").lower()
+        assert "payment" in collected[0].get("message", "")
+
+    def test_missing_file_raises(self, tmp_path):
+        """tail_file should raise FileNotFoundError when the target path does not exist."""
+        missing = tmp_path / "nonexistent.log"
+
+        with pytest.raises(FileNotFoundError):
+            tail_file(str(missing), lambda entry: None, poll_interval=0.05)
