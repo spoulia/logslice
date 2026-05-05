@@ -75,3 +75,38 @@ def format_stats_text(stats: Dict[str, Any]) -> str:
             lines.append(f"  {src:<30} {count}")
 
     return "\n".join(lines)
+
+
+def merge_stats(stats_list: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Merge multiple stats dictionaries into a single combined summary.
+
+    Useful when aggregating statistics from multiple log files or time windows.
+    """
+    if not stats_list:
+        return compute_stats([])
+
+    total = sum(s["total"] for s in stats_list)
+    by_level: Counter = Counter()
+    by_source: Counter = Counter()
+
+    for s in stats_list:
+        by_level.update(s.get("by_level", {}))
+        by_source.update(s.get("by_source", {}))
+
+    timestamps = [
+        s[ts_key]
+        for s in stats_list
+        for ts_key in ("first_timestamp", "last_timestamp")
+        if s.get(ts_key) is not None
+    ]
+
+    error_count = by_level.get("ERROR", 0) + by_level.get("CRITICAL", 0)
+
+    return {
+        "total": total,
+        "by_level": dict(by_level),
+        "by_source": dict(by_source),
+        "first_timestamp": min(timestamps) if timestamps else None,
+        "last_timestamp": max(timestamps) if timestamps else None,
+        "error_rate": round(error_count / total, 4) if total > 0 else 0.0,
+    }
