@@ -1,102 +1,83 @@
-"""Command-line interface for logslice."""
+"""Main CLI entry-point for logslice."""
 
-import sys
+from __future__ import annotations
+
 import argparse
-from typing import List, Optional
+import sys
 
+from logslice.cli_aggregate import add_aggregate_subparser, run_aggregate
+from logslice.cli_export import add_export_subparser, run_export
+from logslice.cli_highlight import add_highlight_subparser, run_highlight
+from logslice.cli_redact import add_redact_subparser, run_redact
+from logslice.cli_summary import add_summary_subparser, run_summary
+from logslice.cli_tail import add_tail_subparser, run_tail
 from logslice.core import filter_logs
-from logslice.filters import filter_by_level, filter_by_pattern, filter_by_fields
 from logslice.formatters import get_formatter
-from logslice.output import write_entries, write_entries_to_file
+from logslice.output import write_entries
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="logslice",
-        description="Fast log filtering utility for structured and unstructured logs.",
+        description="Fast log filtering and analysis utility.",
     )
-    parser.add_argument("input", nargs="?", help="Input log file (default: stdin)")
-    parser.add_argument("-o", "--output", help="Output file (default: stdout)")
-    parser.add_argument(
-        "--start", help="Start timestamp (ISO 8601 or log-native format)"
+    parser.add_argument("--version", action="version", version="logslice 0.1.0")
+
+    sub = parser.add_subparsers(dest="command")
+
+    # filter (default / top-level)
+    filter_p = sub.add_parser("filter", help="Filter log entries.")
+    filter_p.add_argument("input", nargs="?", help="Input log file")
+    filter_p.add_argument("--level", help="Minimum log level")
+    filter_p.add_argument("--pattern", help="Regex pattern to match")
+    filter_p.add_argument(
+        "--format", choices=["plain", "json", "csv"], default="plain"
     )
-    parser.add_argument("--end", help="End timestamp (ISO 8601 or log-native format)")
-    parser.add_argument(
-        "--level",
-        help="Minimum log level to include (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
-    )
-    parser.add_argument(
-        "--levels",
-        nargs="+",
-        metavar="LEVEL",
-        help="Explicit list of levels to include",
-    )
-    parser.add_argument(
-        "--grep", metavar="PATTERN", help="Regex pattern to match in message field"
-    )
-    parser.add_argument(
-        "--grep-field",
-        default="message",
-        metavar="FIELD",
-        help="Field to apply --grep pattern to (default: message)",
-    )
-    parser.add_argument(
-        "--invert", action="store_true", help="Invert --grep match (exclude matches)"
-    )
-    parser.add_argument(
-        "--field",
-        nargs=2,
-        action="append",
-        metavar=("KEY", "VALUE"),
-        dest="fields",
-        help="Filter by exact field value (repeatable)",
-    )
-    parser.add_argument(
-        "--format",
-        choices=["plain", "json", "csv"],
-        default="plain",
-        help="Output format (default: plain)",
-    )
+
+    add_summary_subparser(sub)
+    add_tail_subparser(sub)
+    add_highlight_subparser(sub)
+    add_redact_subparser(sub)
+    add_aggregate_subparser(sub)
+    add_export_subparser(sub)
+
     return parser
 
 
-def run(argv: Optional[List[str]] = None) -> int:
+def run(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.input:
-        with open(args.input, "r", encoding="utf-8") as fh:
-            lines = fh.readlines()
-    else:
-        lines = sys.stdin.readlines()
+    if args.command == "filter" or args.command is None:
+        source = open(args.input) if getattr(args, "input", None) else sys.stdin
+        try:
+            entries = filter_logs(
+                source,
+                min_level=getattr(args, "level", None),
+                pattern=getattr(args, "pattern", None),
+            )
+            fmt = get_formatter(getattr(args, "format", "plain"))
+            write_entries(entries, fmt)
+        finally:
+            if source is not sys.stdin:
+                source.close()
+        return 0
 
-    entries = filter_logs(lines, start=args.start, end=args.end)
-
-    if args.level or args.levels:
-        entries = filter_by_level(entries, min_level=args.level, levels=args.levels)
-
-    if args.grep:
-        entries = filter_by_pattern(
-            entries, pattern=args.grep, field=args.grep_field, invert=args.invert
-        )
-
-    if args.fields:
-        field_kwargs = {k: v for k, v in args.fields}
-        entries = filter_by_fields(entries, **field_kwargs)
-
-    formatter = get_formatter(args.format)
-
-    if args.output:
-        write_entries_to_file(entries, args.output, formatter)
-    else:
-        write_entries(entries, sys.stdout, formatter)
-
+    dispatch = {
+        "summary": run_summary,
+        "tail": run_tail,
+        "highlight": run_highlight,
+        "redact": run_redact,
+        "aggregate": run_aggregate,
+        "export": run_export,
+    }
+    handler = dispatch.get(args.command)
+    if handler is None:
+        parser.print_help()
+        return 1
+    handler(args)
     return 0
 
 
-def main() -> None:
+def main() -> None:  # pragma: no cover
     sys.exit(run())
-
-
-if __name__ == "__main__":
-    main()
