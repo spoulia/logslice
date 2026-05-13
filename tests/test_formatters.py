@@ -104,3 +104,12 @@ class TestWriteEntries:
         count = write_entries([], fmt="plain", dest=buf)
         assert count == 0
         assert buf.getvalue() == ""
+
+    def test_multiple_entries(self):
+        entries = [SAMPLE_ENTRY, MINIMAL_ENTRY]
+        buf = io.StringIO()
+        count = write_entries(entries, fmt="plain", dest=buf)
+        assert count == 2
+        output = buf.getvalue()
+        assert "Something went wrong" in output
+        assert "bare log line" in output
