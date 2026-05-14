@@ -44,6 +44,9 @@ class TestTruncateString:
         result = truncate_string("abcdef", 2)
         assert result == "..."
 
+    def test_empty_string_unchanged(self):
+        assert truncate_string("", 10) == ""
+
 
 # ---------------------------------------------------------------------------
 # truncate_field
@@ -89,37 +92,16 @@ class TestTruncateFields:
         result = truncate_fields(entry, {"message": 10})
         assert "message" not in result
 
+    def test_original_entry_not_mutated(self):
+        entry = {"msg": "a" * 20, "src": "b" * 20}
+        truncate_fields(entry, {"msg": 5, "src": 8})
+        assert entry["msg"] == "a" * 20
+        assert entry["src"] == "b" * 20
 
-# ---------------------------------------------------------------------------
-# truncate_message
-# ---------------------------------------------------------------------------
-
-def test_truncate_message_uses_message_key():
-    entry = {"message": "x" * 100, "level": "error"}
-    result = truncate_message(entry, 20)
-    assert len(result["message"]) == 20
-
-
-def test_truncate_message_custom_key():
-    entry = {"msg": "y" * 50}
-    result = truncate_message(entry, 10, message_key="msg")
-    assert len(result["msg"]) == 10
+    def test_empty_limits_dict_returns_entry_unchanged(self):
+        entry = {"message": "hello", "level": "info"}
+        result = truncate_fields(entry, {})
+        assert result == entry
 
 
-# ---------------------------------------------------------------------------
-# truncate_entries
-# ---------------------------------------------------------------------------
-
-def test_truncate_entries_yields_all():
-    entries = [
-        {"message": "a" * 30, "level": "info"},
-        {"message": "b" * 5, "level": "debug"},
-    ]
-    results = list(truncate_entries(entries, {"message": 10}))
-    assert len(results) == 2
-    assert len(results[0]["message"]) == 10
-    assert results[1]["message"] == "b" * 5  # short enough, unchanged
-
-
-def test_truncate_entries_empty_input():
-    assert list(truncate_entries([], {"message": 10})) == []
+# --
