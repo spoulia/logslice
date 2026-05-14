@@ -40,11 +40,24 @@ def add_replay_subparser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def _read_entries(path: str) -> List[dict]:
+    """Read and parse log entries from *path* (or stdin if path is '-').
+
+    Raises:
+        FileNotFoundError: If *path* does not exist.
+        PermissionError: If the file cannot be opened for reading.
+    """
     if path == "-":
         lines = sys.stdin.readlines()
     else:
-        with open(path) as fh:
-            lines = fh.readlines()
+        try:
+            with open(path) as fh:
+                lines = fh.readlines()
+        except FileNotFoundError:
+            print(f"error: file not found: {path}", file=sys.stderr)
+            sys.exit(1)
+        except PermissionError:
+            print(f"error: permission denied: {path}", file=sys.stderr)
+            sys.exit(1)
     return [parse_log_line(line) for line in lines if line.strip()]
 
 
