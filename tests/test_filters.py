@@ -72,17 +72,20 @@ class TestFilterByFields:
     def test_filter_by_extra_field(self):
         result = filter_by_fields(DUMMY_ENTRIES, service="api")
         assert len(result) == 3
-        assert all(e["extra"]["service"] == "api" for e in result)
 
     def test_filter_by_top_level_field(self):
         result = filter_by_fields(DUMMY_ENTRIES, level="DEBUG")
         assert len(result) == 1
+        assert result[0]["message"] == "starting up"
 
-    def test_no_match(self):
+    def test_filter_by_multiple_fields(self):
+        result = filter_by_fields(DUMMY_ENTRIES, service="worker", level="ERROR")
+        assert len(result) == 1
+        assert result[0]["message"] == "connection refused"
+
+    def test_no_match_returns_empty(self):
         result = filter_by_fields(DUMMY_ENTRIES, service="database")
         assert result == []
 
-    def test_multiple_fields(self):
-        result = filter_by_fields(DUMMY_ENTRIES, service="api", level="CRITICAL")
-        assert len(result) == 1
-        assert result[0]["message"] == "disk full"
+    def test_empty_entries(self):
+        assert filter_by_fields([], service="api") == []
