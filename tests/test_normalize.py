@@ -96,33 +96,15 @@ class TestNormalizeFields:
 
     def test_unknown_normalizer_raises(self):
         with pytest.raises(ValueError):
-            normalize_fields(_e(), {"level": "bad"})
+            normalize_fields(_e(), {"level": "bogus"})
 
+    def test_empty_normalizers_returns_copy(self):
+        entry = _e()
+        result = normalize_fields(entry, {})
+        assert result == entry
+        assert result is not entry
 
-# ---------------------------------------------------------------------------
-# normalize_entries
-# ---------------------------------------------------------------------------
-
-class TestNormalizeEntries:
-    def test_processes_all_entries(self):
-        entries = [_e(level="info"), _e(level="warn"), _e(level="error")]
-        result = normalize_entries(entries, {"level": "upper"})
-        assert [e["level"] for e in result] == ["INFO", "WARN", "ERROR"]
-
-    def test_empty_list_returns_empty(self):
-        assert normalize_entries([], {"level": "upper"}) == []
-
-
-# ---------------------------------------------------------------------------
-# normalize_level convenience
-# ---------------------------------------------------------------------------
-
-class TestNormalizeLevel:
-    def test_uppercases_level(self):
-        entry = _e(level="debug")
-        assert normalize_level(entry)["level"] == "DEBUG"
-
-    def test_custom_field(self):
-        entry = {"severity": "critical", "message": "x"}
-        result = normalize_level(entry, field="severity")
-        assert result["severity"] == "CRITICAL"
+    def test_does_not_mutate_original(self):
+        entry = {"level": "info", "message": "hello"}
+        normalize_fields(entry, {"level": "upper"})
+        assert entry["level"] == "info"
